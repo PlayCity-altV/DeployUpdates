@@ -16,12 +16,12 @@ jobs:
               with:
                   dotnet-version: 6.0.100-preview.2.21155.3
             - name: Build
-              run: dotnet publish PlayCityDeployUpdates -c Release -r ubuntu.22.04-x64 -p:PublishSingleFile=true --self-contained true --output ./artifacts/build
+              run: dotnet publish PlayCityDeployUpdates -c Release -r ubuntu.22.04-x64 -p:PublishSingleFile=true --self-contained true --output PlayCityDeployUpdates/Artifacts/build
             - name: Upload build artifacts
               uses: actions/upload-artifact@v3
               with:
                   name: build
-                  path: ./artifacts/build
+                  path: PlayCityDeployUpdates/Artifacts/build
 
     deploy:
         needs: build
@@ -31,7 +31,7 @@ jobs:
               name: Download build artifacts
               with:
                   name: build
-                  path: ./artifacts/build
+                  path: PlayCityDeployUpdates/Artifacts/build
             
             - uses: actions/create-release@v1
               id: create_release
@@ -43,7 +43,7 @@ jobs:
                   
             - name: Archive files
               run: |
-                  cd ./artifacts
+                  cd PlayCityDeployUpdates/Artifacts
                   zip -r build.zip *
                   
             - name: Publish artifacts to release
@@ -52,7 +52,7 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: ./artifacts/build.zip
+                  asset_path: PlayCityDeployUpdates/Artifacts/build.zip
                   asset_name: build.zip
                   asset_content_type: application/zip
                   
@@ -71,7 +71,7 @@ jobs:
                   username: playcity
                   password: ${{ secrets.SSH_PASSWORD }}
                   port: 41140
-                  source: "./artifacts/server/*"
+                  source: "PlayCityDeployUpdates/Artifacts/build/*"
                   strip_components: 2
                   target: "/home/playcity/deployUpdates"
                   timeout: 5m
