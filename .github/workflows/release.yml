@@ -72,7 +72,7 @@ jobs:
                   password: ${{ secrets.SSH_PASSWORD }}
                   port: 41140
                   source: "PlayCityDeployUpdates/Artifacts/build/*"
-                  strip_components: 2
+                  strip_components: 3
                   target: "/home/playcity/deployUpdates"
                   timeout: 5m
                 
