@@ -16,7 +16,7 @@ jobs:
               with:
                   dotnet-version: 6.0.100-preview.2.21155.3
             - name: Build
-              run: dotnet publish PlayCityyDeployUpdates -c Release --output ./artifacts/build
+              run: dotnet publish PlayCityDeployUpdates -c Release -r ubuntu.22.04-x64 -p:PublishSingleFile=true --self-contained true
             - name: Upload build artifacts
               uses: actions/upload-artifact@v3
               with:
