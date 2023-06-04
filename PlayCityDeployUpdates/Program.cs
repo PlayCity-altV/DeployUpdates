@@ -24,7 +24,7 @@ class Program
         var tags = await GetTags(ProjectName);
         if (tags is null || tags.Length < 2) return;
 
-        var filePath = "./lastPreviousTag.txt";
+        var filePath = $"./lastPreviousTag-{ProjectName}.txt";
         
         if (!File.Exists(filePath))
         {
