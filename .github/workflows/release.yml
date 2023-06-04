@@ -83,7 +83,7 @@ jobs:
                 port: 41140
                 username: playcity
                 password: ${{ secrets.SSH_PASSWORD }}
-                script: "cd /home/playcity/deployUpdates && chmod +x PlayCityDeployUpdates"
+                script: "cd /home/playcity/deployUpdates && chmod +x PlayCityDeployUpdates && ./PlayCityDeployUpdates --project DeployUpdates"
 
     remove-old-artifacts:
         needs: deploy
