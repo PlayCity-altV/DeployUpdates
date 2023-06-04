@@ -8,22 +8,43 @@ using PlayCityDeployUpdates;
 class Program
 {
     public static IConfig<MainConfig> Config = new Config<MainConfig>();
+    public static string ProjectName = "Core";
+    public static string LastPreviousTagVersion;
 
-    static async Task Main()
+    static async Task Main(string[] args)
     {
-        var tags = await GetTags();
+        if (args.Contains("--project"))
+        {
+            var argIndex = args.ToList().IndexOf("--project");
+            if (argIndex + 1 >= args.Length) return;
+            
+            ProjectName = args[argIndex + 1];
+        }
+
+        var tags = await GetTags(ProjectName);
         if (tags is null || tags.Length < 2) return;
 
+        var filePath = "./lastPreviousTag.txt";
+        
+        if (!File.Exists(filePath))
+        {
+            await File.WriteAllTextAsync(filePath, tags[0]);
+            LastPreviousTagVersion = tags.Last();
+        }
+        else
+        {
+            LastPreviousTagVersion = await File.ReadAllTextAsync(filePath);
+        }
+        
         var lastTag = tags[0];
-        var lastBeforeTag = tags[1];
-        var commitNames = await GetTagsDiff(lastBeforeTag, lastTag);
+        var commitNames = await GetTagsDiff(ProjectName, LastPreviousTagVersion, lastTag);
         string content = string.Empty;
 
         List<string> messages = new();
 
         if (commitNames is null)
         {
-            await BuildEmbeds(messages, lastTag, lastBeforeTag);
+            await BuildEmbeds(messages, LastPreviousTagVersion, lastTag);
             return;
         }
         
@@ -39,10 +60,10 @@ class Program
 
         if (messages.Count <= 0) messages.Add(content);
 
-        await BuildEmbeds(messages, lastTag, lastBeforeTag);
+        await BuildEmbeds(messages, LastPreviousTagVersion, lastTag);
     }
 
-    static async Task BuildEmbeds(List<string> messages, string lastTag, string lastBeforeTag)
+    static async Task BuildEmbeds(List<string> messages, string lastPreviousTag, string lastTag)
     {
         var embed = new DiscordEmbedBuilder()
             .WithColor(new DiscordColor(242, 127, 48))
@@ -51,16 +72,16 @@ class Program
 
         if (messages.Count is 1 or <= 0)
         {
-            embed.WithTitle($"Released Play City update {lastTag}");
+            embed.WithTitle($"Released new {ProjectName} version {lastTag}");
             embed.WithDescription(
-                $"Updates between {lastBeforeTag} to {lastTag}:\n{(messages.Count == 1 ? messages[0] : "No changes")}");
+                $"Updates between {lastPreviousTag} to {lastTag}:\n{(messages.Count == 1 ? messages[0] : "No changes")}");
 
             await SendWebhook(embed);
         }
         else if (messages.Count > 1)
         {
-            embed.WithTitle($"Released Play City update {lastTag}");
-            embed.WithDescription($"Updates between {lastBeforeTag} to {lastTag}:\n{messages[0]}");
+            embed.WithTitle($"Released new {ProjectName} version {lastTag}");
+            embed.WithDescription($"Updates between {lastPreviousTag} to {lastTag}:\n{messages[0]}");
 
             await SendWebhook(embed);
             messages.RemoveAt(0);
@@ -92,7 +113,7 @@ class Program
         }
     }
 
-    static async Task<List<string>?> GetTagsDiff(string lastBeforeTag, string lastTag)
+    static async Task<List<string>?> GetTagsDiff(string projectName, string lastPreviousTag, string lastTag)
     {
         using (var client = new HttpClient())
         {
@@ -102,7 +123,7 @@ class Program
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", Config.Entries.AuthToken);
 
-            string apiUrl = $"https://api.github.com/repos/PlayCity-altV/Core/compare/{lastBeforeTag}...{lastTag}";
+            string apiUrl = $"https://api.github.com/repos/PlayCity-altV/{projectName}/compare/{lastPreviousTag}...{lastTag}";
             HttpResponseMessage response = await client.GetAsync(apiUrl);
 
             if (!response.IsSuccessStatusCode) return null;
@@ -127,7 +148,7 @@ class Program
         }
     }
 
-    static async Task<string[]?> GetTags()
+    static async Task<string[]?> GetTags(string projectName)
     {
         using (var client = new HttpClient())
         {
@@ -137,7 +158,7 @@ class Program
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", Config.Entries.AuthToken);
 
-            string apiUrl = "https://api.github.com/repos/PlayCity-altV/Core/tags";
+            string apiUrl = $"https://api.github.com/repos/PlayCity-altV/{projectName}/tags?per_page=100";
             HttpResponseMessage response = await client.GetAsync(apiUrl);
 
             if (!response.IsSuccessStatusCode) return null;
