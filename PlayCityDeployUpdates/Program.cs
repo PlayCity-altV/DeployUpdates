@@ -26,17 +26,19 @@ class Program
 
         var filePath = $"./lastPreviousTag-{ProjectName}.txt";
         
+        var lastTag = tags[0];
+        
         if (!File.Exists(filePath))
         {
-            await File.WriteAllTextAsync(filePath, tags[0]);
+            await File.WriteAllTextAsync(filePath, lastTag);
             LastPreviousTagVersion = tags.Last();
         }
         else
         {
             LastPreviousTagVersion = await File.ReadAllTextAsync(filePath);
+            await File.WriteAllTextAsync(filePath, lastTag);
         }
         
-        var lastTag = tags[0];
         var commitNames = await GetTagsDiff(ProjectName, LastPreviousTagVersion, lastTag);
         string content = string.Empty;
 
