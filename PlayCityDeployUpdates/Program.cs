@@ -76,14 +76,14 @@ class Program
         {
             embed.WithTitle($"Released new {ProjectName} version {lastTag}");
             embed.WithDescription(
-                $"Updates between {lastPreviousTag} to {lastTag}:\n{(messages.Count == 1 ? messages[0].TrimEnd() : "No changes")}");
+                $"Updates between {lastPreviousTag} to {lastTag}:\n{(messages.Count == 1 ? messages[0].TrimEnd('\n') : "No changes")}");
 
             await SendWebhook(embed);
         }
         else if (messages.Count > 1)
         {
             embed.WithTitle($"Released new {ProjectName} version {lastTag}");
-            embed.WithDescription($"Updates between {lastPreviousTag} to {lastTag}:\n{messages[0].TrimEnd()}");
+            embed.WithDescription($"Updates between {lastPreviousTag} to {lastTag}:\n{messages[0].TrimEnd('\n')}");
 
             await SendWebhook(embed);
             messages.RemoveAt(0);
@@ -92,7 +92,7 @@ class Program
 
             foreach (var message in messages)
             {
-                embed.WithDescription(message.TrimEnd());
+                embed.WithDescription(message.TrimEnd('\n'));
                 await SendWebhook(embed);
             }
         }
