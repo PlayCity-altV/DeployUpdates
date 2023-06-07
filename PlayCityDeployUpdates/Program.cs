@@ -70,7 +70,8 @@ class Program
         var embed = new DiscordEmbedBuilder()
             .WithColor(new DiscordColor(242, 127, 48))
             .WithThumbnail(
-                "https://media.discordapp.net/attachments/1105608698400882688/1105608728495018025/logo_no_bg.png");
+                "https://media.discordapp.net/attachments/1105608698400882688/1105608728495018025/logo_no_bg.png")
+            .WithTimestamp(DateTime.Now);
 
         if (messages.Count is 1 or <= 0)
         {
