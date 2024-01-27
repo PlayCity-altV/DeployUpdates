@@ -32,6 +32,15 @@ class Program
 
         var lastTag = tags[0];
 
+        if (!File.Exists(filePath))
+        {
+            LastPreviousTagVersion = tags.Last();
+        }
+        else
+        {
+            LastPreviousTagVersion = await File.ReadAllTextAsync(filePath);
+        }
+        
         var commitNames = await GetTagsDiff(ProjectName, LastPreviousTagVersion, lastTag);
 
         if (commitNames is null)
@@ -78,16 +87,7 @@ class Program
 
         await BuildEmbeds(commitsInfo, LastPreviousTagVersion, lastTag);
         
-        if (!File.Exists(filePath))
-        {
-            await File.WriteAllTextAsync(filePath, lastTag);
-            LastPreviousTagVersion = tags.Last();
-        }
-        else
-        {
-            LastPreviousTagVersion = await File.ReadAllTextAsync(filePath);
-            await File.WriteAllTextAsync(filePath, lastTag);
-        }
+        await File.WriteAllTextAsync(filePath, lastTag);
     }
 
     static async Task BuildEmbeds(Dictionary<string, (string title, List<(string scope, string message)>)> commitsInfo,
@@ -97,7 +97,7 @@ class Program
 
         foreach (var (type, (title, commits)) in commitsInfo)
         {
-            if (commits.Count <= 1)
+            if (commits.Count <= 0)
             {
                 continue;
             }
@@ -136,18 +136,20 @@ class Program
             .WithThumbnail(
                 "https://media.discordapp.net/attachments/1105608698400882688/1105608728495018025/logo_no_bg.png")
             .WithTimestamp(DateTime.Now)
-            .WithTitle($"Released new {ProjectName} version {lastTag}")
+            .WithTitle($"Released {ProjectName} version {lastTag}")
             .WithDescription($"Updates between {lastPreviousTag} -> {lastTag}:"));
 
         foreach (var (name, value) in fieldChunks[0])
         {
-            description += $"{(name.Length > 0 ? name : "")}{(value.Length > 0 ? value + "\n" : "")}";
+            description += $"{(name.Length > 0 ? $"{name}" : "")}{(value.Length > 0 ? $"- {value}\n" : "")}";
         }
 
         embedsBuilders[0].WithDescription(description);
 
         for (int i = 1; i < fieldChunks.Count; i++)
         {
+            description = "";
+            
             embedsBuilders.Add(new DiscordEmbedBuilder()
                 .WithColor(new DiscordColor(242, 127, 48))
                 .WithThumbnail(
@@ -156,7 +158,7 @@ class Program
 
             foreach (var (name, value) in fieldChunks[i])
             {
-                description += $"{(name.Length > 0 ? name + "\n" : "")}{(value.Length > 0 ? value + "\n" : "")}";
+                description += $"{(name.Length > 0 ? $"{name}" : "")}{(value.Length > 0 ? $"- {value}\n" : "")}";
             }
 
             embedsBuilders[i].WithDescription(description + "\n");
