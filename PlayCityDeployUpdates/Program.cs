@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,9 @@ class Program
     public static IConfig<MainConfig> Config = new Config<MainConfig>();
     public static string ProjectName = "Core";
     public static string LastPreviousTagVersion;
+    public static Regex IgnoredPrefixesRE = new(@"^(Merge|Revert|Apply|Conflicts)\b");
+    public static Regex CommitRE = new(@"(\w+)\(([^)]+)\):\s(.+)");
+    public static int ChunkSize = 20;
 
     static async Task Main(string[] args)
     {
@@ -17,7 +21,7 @@ class Program
         {
             var argIndex = args.ToList().IndexOf("--project");
             if (argIndex + 1 >= args.Length) return;
-            
+
             ProjectName = args[argIndex + 1];
         }
 
@@ -25,8 +29,54 @@ class Program
         if (tags is null || tags.Length < 2) return;
 
         var filePath = $"./lastPreviousTag-{ProjectName}.txt";
-        
+
         var lastTag = tags[0];
+
+        var commitNames = await GetTagsDiff(ProjectName, LastPreviousTagVersion, lastTag);
+
+        if (commitNames is null)
+        {
+            return;
+        }
+
+        var commitsInfo = new Dictionary<string, (string title, List<(string scope, string message)> commits)>()
+        {
+            { "feat", ("Features", new()) },
+            { "fix", ("Bug Fixes", new()) },
+            { "chore", ("Chores", new()) },
+            { "build", ("Build", new()) },
+            { "ci", ("Continuous integration (CI)", new()) },
+            { "refactor", ("Refactor", new()) },
+            { "other", ("Commits", new()) },
+        };
+
+        commitNames.ForEach(commitName =>
+        {
+            if (IgnoredPrefixesRE.IsMatch(commitName))
+            {
+                return;
+            }
+
+            var match = CommitRE.Match(commitName);
+            if (match.Success)
+            {
+                var type = match.Groups[1].Value;
+                var scope = match.Groups[2].Value;
+                var message = match.Groups[3].Value;
+
+                if (!commitsInfo.ContainsKey(type))
+                {
+                    commitsInfo["other"].commits.Add(("", commitName));
+                }
+                else commitsInfo[type].commits.Add((scope, message));
+            }
+            else
+            {
+                commitsInfo["other"].commits.Add(("", commitName));
+            }
+        });
+
+        await BuildEmbeds(commitsInfo, LastPreviousTagVersion, lastTag);
         
         if (!File.Exists(filePath))
         {
@@ -38,72 +88,91 @@ class Program
             LastPreviousTagVersion = await File.ReadAllTextAsync(filePath);
             await File.WriteAllTextAsync(filePath, lastTag);
         }
-        
-        var commitNames = await GetTagsDiff(ProjectName, LastPreviousTagVersion, lastTag);
-        string content = string.Empty;
-
-        List<string> messages = new();
-
-        if (commitNames is null)
-        {
-            await BuildEmbeds(messages, LastPreviousTagVersion, lastTag);
-            return;
-        }
-        
-        foreach (var name in commitNames)
-        {
-            content += $"- {name}\n";
-
-            if (content.Length < 4000) continue;
-
-            messages.Add(content);
-            content = string.Empty;
-        }
-
-        if (messages.Count <= 0) messages.Add(content);
-
-        await BuildEmbeds(messages, LastPreviousTagVersion, lastTag);
     }
 
-    static async Task BuildEmbeds(List<string> messages, string lastPreviousTag, string lastTag)
+    static async Task BuildEmbeds(Dictionary<string, (string title, List<(string scope, string message)>)> commitsInfo,
+        string lastPreviousTag, string lastTag)
     {
-        var embed = new DiscordEmbedBuilder()
+        var embedFields = new List<(string name, string value)>();
+
+        foreach (var (type, (title, commits)) in commitsInfo)
+        {
+            if (commits.Count <= 1)
+            {
+                continue;
+            }
+
+            embedFields.Add(($"**{title}**\n\n", ""));
+
+            foreach (var commit in commits)
+            {
+                var scope = commit.scope;
+                var message = commit.message;
+
+                if (scope.Length < 1 && message.Length < 1)
+                {
+                    continue;
+                }
+
+                embedFields.Add(scope.Length >= 1 ? ("", $"{scope}: {message}") : ("", $"{message}"));
+            }
+            
+            embedFields.Add(("\n", ""));
+        }
+
+        List<List<(string name, string value)>> fieldChunks = new();
+
+        for (int i = 0; i < embedFields.Count; i += ChunkSize)
+        {
+            var chunk = embedFields.Skip(i).Take(ChunkSize).ToList();
+            fieldChunks.Add(chunk);
+        }
+
+        var embedsBuilders = new List<DiscordEmbedBuilder>();
+        var description = string.Empty;
+
+        embedsBuilders.Add(new DiscordEmbedBuilder()
             .WithColor(new DiscordColor(242, 127, 48))
             .WithThumbnail(
                 "https://media.discordapp.net/attachments/1105608698400882688/1105608728495018025/logo_no_bg.png")
-            .WithTimestamp(DateTime.Now);
+            .WithTimestamp(DateTime.Now)
+            .WithTitle($"Released new {ProjectName} version {lastTag}")
+            .WithDescription($"Updates between {lastPreviousTag} -> {lastTag}:"));
 
-        if (messages.Count is 1 or <= 0)
+        foreach (var (name, value) in fieldChunks[0])
         {
-            embed.WithTitle($"Released new {ProjectName} version {lastTag}");
-            embed.WithDescription(
-                $"Updates between {lastPreviousTag} to {lastTag}:\n{(messages.Count == 1 ? messages[0].TrimEnd('\n') : "No changes")}");
-
-            await SendWebhook(embed);
+            description += $"{(name.Length > 0 ? name : "")}{(value.Length > 0 ? value + "\n" : "")}";
         }
-        else if (messages.Count > 1)
+
+        embedsBuilders[0].WithDescription(description);
+
+        for (int i = 1; i < fieldChunks.Count; i++)
         {
-            embed.WithTitle($"Released new {ProjectName} version {lastTag}");
-            embed.WithDescription($"Updates between {lastPreviousTag} to {lastTag}:\n{messages[0].TrimEnd('\n')}");
+            embedsBuilders.Add(new DiscordEmbedBuilder()
+                .WithColor(new DiscordColor(242, 127, 48))
+                .WithThumbnail(
+                    "https://media.discordapp.net/attachments/1105608698400882688/1105608728495018025/logo_no_bg.png")
+                .WithTimestamp(DateTime.Now));
 
-            await SendWebhook(embed);
-            messages.RemoveAt(0);
-
-            embed.WithTitle("");
-
-            foreach (var message in messages)
+            foreach (var (name, value) in fieldChunks[i])
             {
-                embed.WithDescription(message.TrimEnd('\n'));
-                await SendWebhook(embed);
+                description += $"{(name.Length > 0 ? name + "\n" : "")}{(value.Length > 0 ? value + "\n" : "")}";
             }
+
+            embedsBuilders[i].WithDescription(description + "\n");
         }
+
+        var embeds = new List<DiscordEmbed>();
+        embedsBuilders.ForEach(embedsBuilder => embeds.Add(embedsBuilder.Build()));
+
+        await SendWebhook(embeds);
     }
 
-    static async Task SendWebhook(DiscordEmbedBuilder embed)
+    static async Task SendWebhook(IEnumerable<DiscordEmbed> embeds)
     {
         var webhookClient = new DiscordWebhookClient(minimumLogLevel: LogLevel.None);
         var webHookBuilder = new DiscordWebhookBuilder()
-            .AddEmbed(embed);
+            .AddEmbeds(embeds);
 
         try
         {
@@ -126,7 +195,8 @@ class Program
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", Config.Entries.AuthToken);
 
-            string apiUrl = $"https://api.github.com/repos/PlayCity-altV/{projectName}/compare/{lastPreviousTag}...{lastTag}";
+            string apiUrl =
+                $"https://api.github.com/repos/PlayCity-altV/{projectName}/compare/{lastPreviousTag}...{lastTag}";
             HttpResponseMessage response = await client.GetAsync(apiUrl);
 
             if (!response.IsSuccessStatusCode) return null;
