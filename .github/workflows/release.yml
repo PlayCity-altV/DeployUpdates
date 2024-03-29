@@ -10,15 +10,15 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v2
+              uses: actions/checkout@v4
             - name: Setup .NET Core SDK
-              uses: actions/setup-dotnet@v3.0.3
+              uses: actions/setup-dotnet@v4
               with:
                   dotnet-version: 6.0.100-preview.2.21155.3
             - name: Build
               run: dotnet publish PlayCityDeployUpdates -c Release -r ubuntu.22.04-x64 -p:PublishSingleFile=true --self-contained true --output PlayCityDeployUpdates/Artifacts/build
             - name: Upload build artifacts
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                   name: build
                   path: PlayCityDeployUpdates/Artifacts/build
@@ -27,7 +27,7 @@ jobs:
         needs: build
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/download-artifact@v2
+            - uses: actions/download-artifact@v4
               name: Download build artifacts
               with:
                   name: build
