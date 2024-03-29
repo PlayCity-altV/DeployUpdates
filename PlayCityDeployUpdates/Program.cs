@@ -132,9 +132,9 @@ class Program
         var description = string.Empty;
 
         embedsBuilders.Add(new DiscordEmbedBuilder()
-            .WithColor(new DiscordColor(242, 127, 48))
+            .WithColor(new DiscordColor("#228ae5"))
             .WithThumbnail(
-                "https://media.discordapp.net/attachments/1105608698400882688/1105608728495018025/logo_no_bg.png")
+                "https://cdn.discordapp.com/attachments/1105608698400882688/1223220213479116851/logo.png?ex=66190f99&is=66069a99&hm=02d2d015afae6aa5adc8486a947feff5d85ba8e58c71411bdcdcfaf1245a2b5d&")
             .WithTimestamp(DateTime.Now)
             .WithTitle($"Released {ProjectName} version {lastTag}")
             .WithDescription($"Updates between {lastPreviousTag} -> {lastTag}:"));
@@ -151,9 +151,9 @@ class Program
             description = "";
             
             embedsBuilders.Add(new DiscordEmbedBuilder()
-                .WithColor(new DiscordColor(242, 127, 48))
+                .WithColor(new DiscordColor("#228ae5"))
                 .WithThumbnail(
-                    "https://media.discordapp.net/attachments/1105608698400882688/1105608728495018025/logo_no_bg.png")
+                    "https://cdn.discordapp.com/attachments/1105608698400882688/1223220213479116851/logo.png?ex=66190f99&is=66069a99&hm=02d2d015afae6aa5adc8486a947feff5d85ba8e58c71411bdcdcfaf1245a2b5d&")
                 .WithTimestamp(DateTime.Now));
 
             foreach (var (name, value) in fieldChunks[i])
